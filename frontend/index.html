@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DermIA Canina | Diagnóstico Inteligente</title>
+    <link rel="stylesheet" href="styles.css?v=3">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <div class="disclaimer-banner">
+            <p><i class="fa-solid fa-circle-info"></i> Esta aplicación utiliza inteligencia artificial como herramienta
+                de apoyo y no reemplaza el diagnóstico de un médico veterinario
+            </p>
+        </div>
+        <nav class="navbar">
+            <div class="logo-stack">
+                <div class="logo">
+                    <i class="fa-solid fa-paw"></i>
+                    <span>DermaDog AI</span>
+                </div>
+                <span class="subtitle">Reconocimiento de Enfermedades Dérmicas Caninas mediante Deep Learning</span>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <section class="input-panel">
+                <div class="tabs">
+                    <button class="tab-btn active" data-tab="upload">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Subir Archivo
+                    </button>
+                    <button class="tab-btn" data-tab="camera">
+                        <i class="fa-solid fa-camera"></i> Cámara
+                    </button>
+                </div>
+
+                <div class="tab-content active" id="upload-tab">
+                    <div class="upload-area" id="drop-zone">
+                        <input type="file" id="file-upload" accept="image/*" hidden>
+                        <i class="fa-regular fa-image upload-icon"></i>
+                        <p>Arrastra una imagen o haz clic para seleccionar</p>
+                        <button class="btn-primary" onclick="document.getElementById('file-upload').click()">Seleccionar
+                            Imagen</button>
+                    </div>
+                </div>
+
+                <div class="tab-content" id="camera-tab">
+                    <div class="camera-container">
+                        <video id="video-feed" autoplay playsinline muted></video>
+                        <canvas id="capture-canvas" hidden></canvas>
+                        <div class="camera-controls">
+                            <button id="capture-btn" class="btn-capture"><i class="fa-solid fa-camera"></i></button>
+                            <button id="switch-camera-btn" class="btn-secondary"><i
+                                    class="fa-solid fa-rotate"></i></button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="result-panel hidden">
+                <div class="loading-overlay hidden" id="loading">
+                    <div class="loader"></div>
+                    <p>Analizando dermis...</p>
+                </div>
+
+                <div class="results-container" id="results">
+                    <div id="diagnosis">
+                        <div class="prediction-header">
+                            <h2>Diagnóstico</h2>
+                            <div class="confidence-badge">
+                                <span id="pred-conf">0%</span> Confianza
+                            </div>
+                        </div>
+
+                        <h1 id="pred-class" class="disease-title">-</h1>
+
+                        <div class="top-predictions">
+                            <h3>Probabilidades</h3>
+                            <div id="top-list"></div>
+                        </div>
+
+                        <div class="visuals-grid">
+                            <div class="visual-card">
+                                <span class="badge">Zona analizada</span>
+                                <img id="original-img" src="" alt="Zona analizada">
+                            </div>
+                            <div class="visual-card">
+                                <span class="badge gradient">IA Heatmap</span>
+                                <img id="gradcam-img" src="" alt="Grad-CAM">
+                            </div>
+                        </div>
+
+                        <div id="disease-info" class="disease-info hidden">
+                            <h3><i class="fa-solid fa-book-medical"></i> Sobre esta condición</h3>
+                            <p id="info-description"></p>
+
+                            <h4>Signos comunes</h4>
+                            <ul id="info-signs"></ul>
+
+                            <div id="info-contagious" class="contagious">
+                                <i class="fa-solid fa-people-arrows"></i>
+                                <div>
+                                    <strong id="info-contagious-label"></strong>
+                                    <span id="info-contagious-text"></span>
+                                </div>
+                            </div>
+
+                            <h4>Recomendación</h4>
+                            <p id="info-recommendation"></p>
+
+                            <p class="info-note"><i class="fa-solid fa-user-doctor"></i> Esta información es orientativa. Consulte siempre a un médico veterinario para un diagnóstico y tratamiento.</p>
+                        </div>
+                    </div>
+
+                    <div id="rejection" class="rejection-card hidden">
+                        <i id="rejection-icon" class="fa-solid fa-triangle-exclamation rejection-icon"></i>
+                        <h2 id="rejection-title">-</h2>
+                        <p id="rejection-message">-</p>
+                    </div>
+
+                    <button class="btn-reset" id="reset-btn">
+                        <i class="fa-solid fa-arrow-rotate-right"></i> Nuevo Análisis
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <footer class="app-footer">
+            <p>Diplomado en Inteligencia Artificial y Ciencia de Datos - FIRNT</p>
+            <p class="copyright">&copy; Luis Robert Farfan Sivila</p>
+        </footer>
+    </div>
+    <script src="diseases.js?v=3"></script>
+    <script src="script.js?v=3"></script>
+</body>
+
+</html>
