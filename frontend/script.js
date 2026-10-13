@@ -7,6 +7,7 @@ const video = document.getElementById('video-feed');
 const canvas = document.getElementById('capture-canvas');
 const captureBtn = document.getElementById('capture-btn');
 const switchCameraBtn = document.getElementById('switch-camera-btn');
+const torchBtn = document.getElementById('torch-btn');
 
 // Result Elements
 const inputPanel = document.querySelector('.input-panel');
@@ -99,14 +100,19 @@ async function startCamera() {
     try {
         if (stream) stopCamera();
 
+        // Ask for a high resolution: without it many phones default to
+        // 640x480, too little detail for skin lesions
         const constraints = {
             video: {
-                facingMode: currentFacingMode
+                facingMode: currentFacingMode,
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
             }
         };
 
         stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
+        setupTorch();
     } catch (err) {
         console.error("Error accessing camera:", err);
         let msg = "No se pudo acceder a la cámara.";
@@ -133,7 +139,33 @@ function stopCamera() {
         stream = null;
         video.srcObject = null;
     }
+    torchOn = false;
+    torchBtn.classList.remove('active');
+    torchBtn.classList.add('invisible');
 }
+
+// --- Torch (flashlight) ---
+// Only offered when the browser and the active camera support it
+// (mainly Chrome on Android, rear camera)
+let torchOn = false;
+
+function setupTorch() {
+    const track = stream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+    torchBtn.classList.toggle('invisible', !capabilities.torch);
+}
+
+torchBtn.addEventListener('click', async () => {
+    if (!stream) return;
+    const track = stream.getVideoTracks()[0];
+    try {
+        await track.applyConstraints({ advanced: [{ torch: !torchOn }] });
+        torchOn = !torchOn;
+        torchBtn.classList.toggle('active', torchOn);
+    } catch (err) {
+        console.error("Error toggling torch:", err);
+    }
+});
 
 switchCameraBtn.addEventListener('click', () => {
     currentFacingMode = currentFacingMode === 'environment' ? 'user' : 'environment';
@@ -143,13 +175,16 @@ switchCameraBtn.addEventListener('click', () => {
 captureBtn.addEventListener('click', () => {
     if (!stream) return;
 
-    // Set canvas dimensions to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Capture only the centered square shown in the viewfinder,
+    // so the photo sent is exactly what the user framed
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const side = Math.min(vw, vh);
+    canvas.width = side;
+    canvas.height = side;
 
-    // Draw current frame
     const ctx = canvas.getContext('2d');
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, (vw - side) / 2, (vh - side) / 2, side, side, 0, 0, side, side);
 
     // Convert to blob
     canvas.toBlob((blob) => {

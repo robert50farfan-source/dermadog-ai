@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DermIA Canina | Diagnóstico Inteligente</title>
-    <link rel="stylesheet" href="styles.css?v=3">
+    <link rel="stylesheet" href="styles.css?v=4">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 </head>
@@ -51,13 +51,28 @@
                 <div class="tab-content" id="camera-tab">
                     <div class="camera-container">
                         <video id="video-feed" autoplay playsinline muted></video>
-                        <canvas id="capture-canvas" hidden></canvas>
-                        <div class="camera-controls">
-                            <button id="capture-btn" class="btn-capture"><i class="fa-solid fa-camera"></i></button>
-                            <button id="switch-camera-btn" class="btn-secondary"><i
-                                    class="fa-solid fa-rotate"></i></button>
+                        <!-- Marks the exact region the model analyzes (its center crop) -->
+                        <div class="camera-guide">
+                            <span class="guide-hint">Centre la lesión aquí</span>
                         </div>
+                        <canvas id="capture-canvas" hidden></canvas>
                     </div>
+                    <div class="camera-controls">
+                        <button id="torch-btn" class="btn-round invisible" aria-label="Linterna" title="Linterna">
+                            <i class="fa-solid fa-bolt"></i>
+                        </button>
+                        <button id="capture-btn" class="btn-capture" aria-label="Tomar foto">
+                            <i class="fa-solid fa-camera"></i>
+                        </button>
+                        <button id="switch-camera-btn" class="btn-round" aria-label="Cambiar cámara" title="Cambiar cámara">
+                            <i class="fa-solid fa-rotate"></i>
+                        </button>
+                    </div>
+                    <ul class="camera-tips">
+                        <li><i class="fa-solid fa-ruler-vertical"></i> Acérquese a unos 10–15 cm de la piel</li>
+                        <li><i class="fa-solid fa-sun"></i> Use buena luz; active la linterna si está oscuro</li>
+                        <li><i class="fa-solid fa-hand"></i> Mantenga el celular quieto al tomar la foto</li>
+                    </ul>
                 </div>
             </section>
 
@@ -134,8 +149,8 @@
             <p class="copyright">&copy; Luis Robert Farfan Sivila</p>
         </footer>
     </div>
-    <script src="diseases.js?v=3"></script>
-    <script src="script.js?v=3"></script>
+    <script src="diseases.js?v=4"></script>
+    <script src="script.js?v=4"></script>
 </body>
 
 </html>
