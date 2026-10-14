@@ -634,6 +634,15 @@ video {
     font-size: 0.75rem;
 }
 
+.footer-credit a {
+    color: inherit;
+    text-decoration: underline;
+}
+
+.footer-credit a:hover {
+    color: var(--primary);
+}
+
 /* Disclaimer Banner */
 .disclaimer-banner {
     background-color: #fff3cd;
