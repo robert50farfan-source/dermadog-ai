@@ -626,7 +626,12 @@ video {
 
 .copyright {
     font-weight: 600;
+    font-size: 0.95rem;
     color: var(--primary-dark);
+}
+
+.footer-credit {
+    font-size: 0.75rem;
 }
 
 /* Disclaimer Banner */
