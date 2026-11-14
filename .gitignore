@@ -15,3 +15,7 @@ env/
 .idea/
 Thumbs.db
 .DS_Store
+
+data/
+verificacion/resultados/*.json
+training/salidas/
