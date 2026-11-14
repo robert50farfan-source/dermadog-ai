@@ -200,7 +200,7 @@ video {
     display: block;
 }
 
-/* Inset 6.25% = the 224/256 center crop the model uses */
+/* Margen interior del 6,25 % = el recorte central 224/256 que usa el modelo */
 .camera-guide {
     position: absolute;
     inset: 6.25%;
