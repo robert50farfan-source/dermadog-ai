@@ -28,6 +28,7 @@ COMANDOS_PROHIBIDOS = [
     (r"\bdocker\s+push\b", "publicar imagen Docker"),
     (r"dokploy", "despliegue en Dokploy"),
     (r"\brm\s+-[a-z]*r[a-z]*f|\brm\s+-[a-z]*f[a-z]*r", "borrado recursivo"),
+    (r"\b(Remove-Item|ri|rd|rmdir|del|erase)\b.*\s-r(ecurse)?\b", "borrado recursivo"),
     (r"\bgit\s+reset\s+--hard\b", "descartar cambios"),
     (r"\bkaggle\s+datasets\s+(create|version)\b", "publicar datos en Kaggle"),
 ]
@@ -38,7 +39,8 @@ def normalizar(ruta):
 
 
 def es_protegida(ruta):
-    ruta = normalizar(ruta)
+    # Sin comillas y con "/" final, para detectar también la carpeta sola (rm -r verificacion)
+    ruta = normalizar(ruta).strip("'\"").rstrip("/") + "/"
     if any(e in ruta for e in EXCEPCIONES):
         return False
     return any(p in ruta for p in PROTEGIDAS)
@@ -52,9 +54,18 @@ def destinos_de_escritura(comando):
         if not partes:
             continue
         programa = partes[0]
-        if programa in ("tee", "mv", "cp", "rm", "touch", "truncate") or (programa == "sed" and "-i" in partes):
+        if programa.lower() in ESCRITURA or (programa == "sed" and "-i" in partes):
             destinos += [p for p in partes[1:] if not p.startswith("-")]
     return destinos
+
+
+# Programas de shell y cmdlets de PowerShell (con sus alias) que escriben, mueven o borran archivos
+ESCRITURA = {
+    "tee", "mv", "cp", "rm", "touch", "truncate",
+    "set-content", "sc", "add-content", "ac", "out-file", "clear-content", "clc", "tee-object",
+    "remove-item", "ri", "del", "erase", "rd", "rmdir", "move-item", "mi", "move",
+    "copy-item", "cpi", "copy", "new-item", "ni", "rename-item", "rni",
+}
 
 
 def bloquear(motivo):
@@ -76,7 +87,8 @@ def main():
         if es_protegida(ruta):
             bloquear(f"{ruta} es de solo lectura para los agentes")
 
-    if herramienta == "Bash":
+    # La herramienta PowerShell (Windows) recibe los mismos controles que Bash
+    if herramienta in ("Bash", "PowerShell"):
         comando = entrada.get("command", "")
         for patron, motivo in COMANDOS_PROHIBIDOS:
             if re.search(patron, comando, re.IGNORECASE):
