@@ -1,5 +1,7 @@
-"""El tensor que recibe el modelo en la app debe ser el mismo que vio al entrenar."""
+"""El tensor que recibe el modelo en la app debe ser el de la definición única (verificacion/referencia.py)."""
 import io
+import re
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -48,6 +50,19 @@ def test_acepta_imagenes_con_canal_alfa(model_utils_aislado):
     imagen = imagen_con_textura(300, 300).convert("RGBA")
     x = tensor_que_ve_el_modelo(model_utils_aislado, imagen)
     assert x.shape[1] == 3
+
+
+@pytest.mark.hallazgo("H1")
+def test_H1_el_preprocesamiento_vive_en_un_solo_modulo():
+    """La app usa backend/app/transforms.py y no define su propio Resize/CenterCrop."""
+    from backend.app.transforms import get_eval_transforms
+    imagen = imagen_con_textura(640, 480, semilla=7)
+    diferencia = (get_eval_transforms()(imagen) - transformacion_evaluacion()(imagen)).abs().max().item()
+    assert diferencia < 1e-6, f"transforms.py difiere de la referencia: {diferencia:.3f}"
+    # Se revisa solo el código, sin comentarios: mencionar Resize en un comentario no es definirlo
+    lineas = Path("backend/app/model_utils.py").read_text(encoding="utf-8").splitlines()
+    codigo = "\n".join(linea.split("#", 1)[0] for linea in lineas)
+    assert not re.search(r"\b(Resize|CenterCrop)\(", codigo), "model_utils.py define su propio preprocesamiento"
 
 
 @pytest.mark.hallazgo("H1")

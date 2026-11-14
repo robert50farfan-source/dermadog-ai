@@ -1,9 +1,15 @@
-"""Referencias fijas tomadas del notebook de entrenamiento (torchDogF.ipynb, celdas 7 y 25).
+"""Referencias fijas: la vara de medir del preprocesamiento y de las clases.
 
-Son la vara de medir: la app debe darle al modelo exactamente lo que el modelo vio al entrenar.
+Definición única de evaluación (decisión del 2026-11-14, opción A): Resize(256) + CenterCrop(224),
+la que ya usaba la app. Medida con verificacion/linea_base.py en valid y en test, rinde mejor que
+Resize((224, 224)), la val_test_transforms del notebook. El modelo se entrenó con RandomResizedCrop
+(70-100 % del área): el recorte central se parece más a esas imágenes que la foto completa deformada.
+
+La app, la evaluación y la validación del entrenamiento deben producir exactamente este tensor.
 """
 import torchvision.transforms as T
 
+RESIZE = 256
 IMG_SIZE = 224
 MEDIA_IMAGENET = [0.485, 0.456, 0.406]
 DESVIO_IMAGENET = [0.229, 0.224, 0.225]
@@ -20,9 +26,10 @@ CLASS_TO_IDX = {
 
 
 def transformacion_evaluacion():
-    """val_test_transforms del notebook: la que produjo el 0,94 de test."""
+    """Definición única de evaluación: Resize(256) + CenterCrop(224) + normalización de ImageNet."""
     return T.Compose([
-        T.Resize((IMG_SIZE, IMG_SIZE)),
+        T.Resize(RESIZE),
+        T.CenterCrop(IMG_SIZE),
         T.ToTensor(),
         T.Normalize(MEDIA_IMAGENET, DESVIO_IMAGENET),
     ])

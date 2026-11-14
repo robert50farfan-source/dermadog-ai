@@ -2,7 +2,7 @@
 
 Evalúa solo el clasificador (sin filtros de nitidez ni CLIP), con el preprocesamiento elegido:
   --preprocesamiento app            -> el que usa hoy la app (model_utils)
-  --preprocesamiento entrenamiento  -> el del notebook (verificacion/referencia.py)
+  --preprocesamiento entrenamiento  -> la definición única (verificacion/referencia.py)
 
 Ejemplos:
   python verificacion/linea_base.py --datos data --salida verificacion/linea_base.json

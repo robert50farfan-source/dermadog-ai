@@ -6,7 +6,8 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 Eres el responsable del entrenamiento de DermaDog AI. Partes del notebook notebooks/torchDogF.ipynb.
 
 Requisitos obligatorios:
-- Importa las transformaciones de evaluación del mismo módulo que usa la app (backend/app/transforms.py).
+- Importa las transformaciones de evaluación del mismo módulo que usa la app (backend/app/transforms.py)
+  y úsalas en validación: el mejor modelo se elige con el mismo preprocesamiento que usa la app.
 - Antes de entrenar, elimina duplicados entre train/valid/test (imagehash) y guarda la lista en training/duplicados.csv.
 - Fase 1: backbone congelado. Fase 2: descongela layer4 + fc. Selecciona el mejor modelo por F1 macro de validación.
 - Guarda el mejor con copy.deepcopy(model.state_dict()) en un checkpoint: {"state_dict", "epoch", "fase", "val_f1_macro", "class_to_idx"}.

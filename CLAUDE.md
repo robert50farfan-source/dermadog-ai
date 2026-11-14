@@ -18,8 +18,10 @@ explicación con Grad-CAM. Frontend HTML/CSS/JS sin frameworks. Despliegue con D
 - verificacion/ — controles automáticos y línea base. NO se modifican: son la vara de medir.
 
 ## Reglas
-1. Un solo preprocesamiento de evaluación, compartido por entrenamiento, evaluación y app.
-   La referencia es la del entrenamiento: Resize((224, 224)) + ToTensor + Normalize(ImageNet).
+1. Un solo preprocesamiento de evaluación, definido en backend/app/transforms.py y compartido por la app,
+   la evaluación y la validación del entrenamiento. La referencia es verificacion/referencia.py:
+   Resize(256) + CenterCrop(224) + ToTensor + Normalize(ImageNet). Se eligió midiendo en valid y test
+   (decisión del 2026-11-14); no se cambia sin una nueva medición aprobada por el humano.
 2. Ninguna métrica se escribe a mano: salen de scikit-learn o de los scripts de verificacion/.
 3. El mejor modelo se guarda con copy.deepcopy(model.state_dict()) junto con época y métrica.
 4. Todo cambio debe dejar verde: `python -m pytest verificacion/tests -m "not hallazgo" -q`.
@@ -28,7 +30,8 @@ explicación con Grad-CAM. Frontend HTML/CSS/JS sin frameworks. Despliegue con D
 7. Si no puedes verificar algo ejecutándolo, dilo; no lo afirmes.
 
 ## Hallazgos abiertos (auditoría 2026-11-14)
-- H1 (alta) La app preprocesa con Resize(256)+CenterCrop(224); el modelo se entrenó y evaluó con Resize((224,224)).
+- H1 (alta) No hay una definición única del preprocesamiento: está escrito dentro de model_utils.py y, distinto,
+  en el notebook (Resize((224,224))). Se adopta para todos Resize(256)+CenterCrop(224), la de la app.
 - H2 (alta) Notebook: state_dict().copy() es copia superficial; model_final_resnet50.pth es la última época, no la mejor.
 - H3 (media) load_model() cae a strict=False en silencio si los pesos no coinciden.
 - H4 (media) Grad-CAM comparte estado (hooks, activaciones) entre peticiones concurrentes sin lock.

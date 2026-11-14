@@ -59,13 +59,12 @@ FASES = {
         "agente": "dev-api",
         "tarea": (
             "Corrige el hallazgo H1 de CLAUDE.md. Crea backend/app/transforms.py con get_eval_transforms() "
-            "idéntica a la del entrenamiento (Resize((224, 224)) + ToTensor + Normalize de ImageNet) y úsala en "
-            "model_utils.py. Ajusta center_crop_like_model para que la imagen que se superpone con Grad-CAM sea "
-            "la misma región que ve el modelo (la imagen completa redimensionada). Ajusta también la guía de la cámara: "
-            "en frontend/styles.css, .camera-guide usa inset: 6.25% porque marcaba el recorte central 224/256; "
-            "ahora el modelo ve todo el cuadrado capturado, así que la guía debe abarcar el visor completo. "
-            "Actualiza los comentarios de styles.css e index.html y sube la versión ?v= de los recursos en "
-            "index.html. Actualiza README.md si cambia algo visible."
+            "idéntica a verificacion/referencia.py (Resize(256) + CenterCrop(224) + ToTensor + Normalize de "
+            "ImageNet), con las constantes de tamaño definidas en ese módulo. Úsala en model_utils.py en lugar de "
+            "get_transforms(), sin dejar ningún Resize ni CenterCrop en model_utils.py. Haz que "
+            "center_crop_like_model calcule el recorte con esas mismas constantes, para que la imagen que se "
+            "superpone con Grad-CAM siga siendo la región que ve el modelo. La región no cambia: no modifiques "
+            "la guía de la cámara del frontend, que ya marca ese recorte. El rendimiento no debe cambiar."
         ),
         "controles": [
             f'{PY} -m pytest verificacion/tests -m hallazgo -k H1 -q -p no:cacheprovider',
