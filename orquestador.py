@@ -28,7 +28,10 @@ MAX_INTENTOS = 3
 PYTEST_RAPIDO = f'{PY} -m pytest verificacion/tests -m "not hallazgo and not lento" -q -p no:cacheprovider'
 # En Windows, subprocess decodifica con cp1252 y se cae con texto UTF-8 (por ejemplo "Á" o emojis).
 # Se lee todo como UTF-8 y se pide lo mismo a los procesos Python hijos.
-ENTORNO = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+# El `python` que usan los agentes es el mismo con el que se ejecuta el orquestador (el del .venv):
+# el Python del sistema no tiene pytest ni torch.
+ENTORNO = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8",
+           "PATH": str(Path(PY).parent) + os.pathsep + os.environ.get("PATH", "")}
 TEXTO = {"text": True, "encoding": "utf-8", "errors": "replace", "env": ENTORNO}
 
 
@@ -124,8 +127,10 @@ def correr(comando, simular=False):
 
 
 def claude(prompt, simular=False):
+    # En modo -p los comandos no aprobados se rechazan: se permiten solo los tests y la compilación
     comando = ["claude", "-p", prompt, "--output-format", "json",
-               "--permission-mode", "acceptEdits", "--max-turns", "60"]
+               "--permission-mode", "acceptEdits", "--max-turns", "60",
+               "--allowedTools", "Bash(python -m pytest:*)", "Bash(python -m py_compile:*)"]
     print(f"$ claude -p {shlex.quote(prompt[:90])}...")
     if simular:
         return ""
