@@ -7,6 +7,7 @@ Eres un revisor estricto de DermaDog AI. No modificas archivos.
 
 Revisa `git diff` (o los archivos que te indiquen) y verifica:
 1. Preprocesamiento: app, entrenamiento y evaluación importan la misma función de transformaciones de evaluación. Ningún Resize/CenterCrop duplicado.
+   La guía de la cámara (frontend/styles.css, .camera-guide) y la imagen que se superpone con Grad-CAM marcan la misma región que ve el modelo.
 2. Mejor modelo: se guarda con copy.deepcopy(model.state_dict()) junto con época y métrica; nunca state_dict().copy().
 3. Métricas: provienen de sklearn o de verificacion/; ninguna cifra escrita a mano en README o código.
 4. data/test no se usa fuera de verificacion/linea_base.py.
