@@ -1,0 +1,105 @@
+{
+  "fecha": "2026-11-14T22:05:39+00:00",
+  "modelo": "backend\\models\\model_final_resnet50.pth",
+  "particion": "test",
+  "preprocesamiento": "app",
+  "n": 433,
+  "exactitud": 0.953810623556582,
+  "f1_macro": 0.9470020084034737,
+  "por_clase": {
+    "Dermatitis": {
+      "precision": 0.9,
+      "recall": 0.9545454545454546,
+      "f1-score": 0.9264705882352942,
+      "support": 66.0
+    },
+    "Fungal_infections": {
+      "precision": 0.92,
+      "recall": 0.8518518518518519,
+      "f1-score": 0.8846153846153846,
+      "support": 54.0
+    },
+    "Healthy": {
+      "precision": 0.9295774647887324,
+      "recall": 0.9565217391304348,
+      "f1-score": 0.9428571428571428,
+      "support": 69.0
+    },
+    "Hypersensitivity": {
+      "precision": 1.0,
+      "recall": 0.9310344827586207,
+      "f1-score": 0.9642857142857143,
+      "support": 29.0
+    },
+    "demodicosis": {
+      "precision": 0.9803921568627451,
+      "recall": 1.0,
+      "f1-score": 0.9900990099009901,
+      "support": 100.0
+    },
+    "ringworm": {
+      "precision": 0.9823008849557522,
+      "recall": 0.9652173913043478,
+      "f1-score": 0.9736842105263158,
+      "support": 115.0
+    }
+  },
+  "clases": [
+    "Dermatitis",
+    "Fungal_infections",
+    "Healthy",
+    "Hypersensitivity",
+    "demodicosis",
+    "ringworm"
+  ],
+  "matriz_confusion": [
+    [
+      63,
+      1,
+      0,
+      0,
+      0,
+      2
+    ],
+    [
+      2,
+      46,
+      4,
+      0,
+      2,
+      0
+    ],
+    [
+      2,
+      1,
+      66,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1,
+      1,
+      27,
+      0,
+      0
+    ],
+    [
+      0,
+      0,
+      0,
+      0,
+      100,
+      0
+    ],
+    [
+      3,
+      1,
+      0,
+      0,
+      0,
+      111
+    ]
+  ]
+}
