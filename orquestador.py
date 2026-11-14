@@ -16,6 +16,7 @@ Uso:
 """
 import argparse
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -25,6 +26,10 @@ RAIZ = Path(__file__).resolve().parent
 PY = sys.executable
 MAX_INTENTOS = 3
 PYTEST_RAPIDO = f'{PY} -m pytest verificacion/tests -m "not hallazgo and not lento" -q -p no:cacheprovider'
+# En Windows, subprocess decodifica con cp1252 y se cae con texto UTF-8 (por ejemplo "Á" o emojis).
+# Se lee todo como UTF-8 y se pide lo mismo a los procesos Python hijos.
+ENTORNO = {**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+TEXTO = {"text": True, "encoding": "utf-8", "errors": "replace", "env": ENTORNO}
 
 
 def hay_datos():
@@ -112,7 +117,7 @@ def correr(comando, simular=False):
     print(f"$ {comando}")
     if simular:
         return 0, ""
-    r = subprocess.run(comando, shell=True, cwd=RAIZ, capture_output=True, text=True)
+    r = subprocess.run(comando, shell=True, cwd=RAIZ, capture_output=True, **TEXTO)
     salida = (r.stdout + r.stderr).strip()
     print(salida[-3000:])
     return r.returncode, salida
@@ -124,7 +129,7 @@ def claude(prompt, simular=False):
     print(f"$ claude -p {shlex.quote(prompt[:90])}...")
     if simular:
         return ""
-    r = subprocess.run(comando, cwd=RAIZ, capture_output=True, text=True)
+    r = subprocess.run(comando, cwd=RAIZ, capture_output=True, **TEXTO)
     try:
         return json.loads(r.stdout).get("result", "")
     except json.JSONDecodeError:
@@ -194,6 +199,8 @@ def ejecutar(fase, simular=False):
 
 
 def main():
+    # Si la salida va a un archivo o a una tubería, un carácter no representable no detiene el orquestador
+    sys.stdout.reconfigure(errors="replace")
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("accion", choices=["plan", "ejecutar", "controles"])
     p.add_argument("fase", nargs="?", choices=list(FASES))
