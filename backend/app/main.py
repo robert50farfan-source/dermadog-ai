@@ -2,6 +2,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from PIL import Image, UnidentifiedImageError
 from . import model_utils
 import io
 import base64
@@ -98,7 +99,7 @@ def read_limited(upload, limit=MAX_UPLOAD_BYTES):
 @app.post("/predict")
 def predict(file: UploadFile = File(...)):
     if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image.")
+        raise HTTPException(status_code=400, detail="El archivo debe ser una imagen.")
 
     image_stream = read_limited(file)
 
@@ -108,9 +109,15 @@ def predict(file: UploadFile = File(...)):
         # Nunca se predice con pesos incorrectos o sin cargar (H3)
         logger.error("Predicción rechazada: modelo no disponible (%s)", e)
         raise HTTPException(status_code=503, detail="El modelo no está disponible. Inténtelo más tarde.")
-    except Exception as e:
+    except UnidentifiedImageError:
+        # El Content-Type dice imagen, pero el contenido no se puede abrir (archivo dañado o de otro tipo)
+        raise HTTPException(status_code=400, detail="El archivo no es una imagen válida o está dañado.")
+    except Image.DecompressionBombError:
+        raise HTTPException(status_code=400, detail="La imagen tiene demasiados píxeles para analizarla.")
+    except Exception:
+        # El detalle técnico queda en el log; al usuario no se le muestran mensajes internos
         logger.exception("Error al procesar /predict")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Ocurrió un error inesperado al procesar la imagen.")
 
     return JSONResponse(content={
         "status": result["status"],

@@ -196,6 +196,27 @@ captureBtn.addEventListener('click', () => {
 });
 
 // --- API Interaction ---
+// Mismo límite que el backend (MAX_UPLOAD_BYTES en backend/app/main.py)
+const MAX_UPLOAD_MB = 10;
+
+// Título de la tarjeta según el código de error del backend; el texto viene en `detail`
+const ERROR_TITLES = {
+    400: 'Archivo no válido',
+    413: 'Imagen demasiado pesada',
+    503: 'Servicio no disponible'
+};
+
+// Muestra un error en la misma tarjeta que los rechazos, con el botón "Nuevo Análisis"
+function showError(title, message) {
+    rejectionIconEl.className = 'fa-solid fa-triangle-exclamation rejection-icon';
+    rejectionTitleEl.innerText = title;
+    rejectionMessageEl.innerText = message;
+    rejectionEl.classList.remove('hidden');
+    diagnosisEl.classList.add('hidden');
+    loadingOverlay.classList.add('hidden');
+    resultsContainer.classList.remove('hidden');
+}
+
 async function analyzeImage(file) {
     // UI Transitions
     inputPanel.classList.add('hidden');
@@ -203,17 +224,43 @@ async function analyzeImage(file) {
     loadingOverlay.classList.remove('hidden');
     resultsContainer.classList.add('hidden'); // Hide results until ready
 
+    // Se avisa antes de subir: ante un archivo demasiado grande el servidor corta la
+    // conexión, y en el celular el navegador suele ver un error de red, no el 413
+    if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
+        const mb = (file.size / (1024 * 1024)).toLocaleString('es', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+        showError(ERROR_TITLES[413], `La foto pesa ${mb} MB y el máximo es ${MAX_UPLOAD_MB} MB. ` +
+            'Elija una foto más liviana o tómela con la pestaña Cámara.');
+        return;
+    }
+
     const formData = new FormData();
     formData.append('file', file);
 
+    let response;
     try {
-        const response = await fetch('/predict', {
+        response = await fetch('/predict', {
             method: 'POST',
             body: formData
         });
+    } catch (error) {
+        console.error(error);
+        showError('Sin conexión', 'No se pudo conectar con el servidor. Revise su conexión e inténtelo de nuevo.');
+        return;
+    }
 
-        if (!response.ok) throw new Error("Error en la predicción");
+    if (!response.ok) {
+        let detail = null;
+        try {
+            detail = (await response.json()).detail;
+        } catch (_) {
+            // Respuesta sin JSON (por ejemplo, de un proxy): se usa el mensaje genérico
+        }
+        showError(ERROR_TITLES[response.status] || 'No se pudo analizar',
+            typeof detail === 'string' ? detail : 'Ocurrió un error inesperado. Inténtelo de nuevo.');
+        return;
+    }
 
+    try {
         const data = await response.json();
 
         // Update UI
@@ -241,8 +288,7 @@ async function analyzeImage(file) {
 
     } catch (error) {
         console.error(error);
-        alert("Ocurrió un error. Inténtalo de nuevo.");
-        resetState();
+        showError('No se pudo analizar', 'La respuesta del servidor no es válida. Inténtelo de nuevo.');
     }
 }
 
