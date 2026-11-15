@@ -1,6 +1,5 @@
 import torch
 import torchvision.models as models
-import torchvision.transforms as transforms
 import json
 import os
 import cv2
@@ -8,6 +7,8 @@ import numpy as np
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
 from .gradcam import GradCAM
+# Preprocesamiento único de evaluación (H1): no se redefine aquí
+from .transforms import get_eval_transforms, model_crop_box
 
 # Configuration - Easy to change later
 MODEL_PATH = "backend/models/model_final_resnet50.pth"
@@ -23,14 +24,6 @@ CLASS_TRANSLATIONS = {
     "demodicosis": "Demodicosis",
     "ringworm": "Tiña"
 }
-
-def get_transforms():
-    return transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
 
 # Blur check: sharpness of the sharpest regions, measured at a fixed size
 BLUR_THRESHOLD = 25
@@ -66,14 +59,11 @@ def sharpness_score(image, size=512, grid=4, percentile=90):
     return float(np.percentile(tiles, percentile))
 
 def center_crop_like_model(image, display_size=448):
-    # Same region the model sees with Resize(256) + CenterCrop(224),
-    # but cropped from the original resolution so the overlay stays sharp
-    w, h = image.size
-    side = min(w, h) * 224 / 256
-    left = (w - side) / 2
-    top = (h - side) / 2
-    crop = image.crop((round(left), round(top), round(left + side), round(top + side)))
-    return crop.resize((display_size, display_size), resample=Image.BILINEAR)
+    # Misma región que ve el modelo con get_eval_transforms() (constantes de transforms.py),
+    # pero tomada de la resolución original para que la superposición de Grad-CAM se vea nítida.
+    # El box admite coordenadas fraccionarias: PIL remuestrea esa región exacta, sin redondearla.
+    box = model_crop_box(*image.size)
+    return image.resize((display_size, display_size), resample=Image.BILINEAR, box=box)
 
 def rejection(status, message):
     return {
@@ -102,24 +92,24 @@ def load_class_mapping(path=CLASS_IDX_PATH):
 
 def load_model(path=MODEL_PATH, num_classes=6):
     print(f"Loading model from {path}...")
-    model = models.resnet50(pretrained=False) # We load our own weights
-    
-    # Adjust final layer to match the saved architecture
-    # Based on state_dict keys: fc.1 (Linear), fc.3 (BN), fc.5 (Linear)
-    # This implies: 0:Dropout/Identity, 1:Linear, 2:ReLU, 3:BN, 4:Dropout, 5:Linear
+    model = models.resnet50(pretrained=False) # Cargamos nuestros propios pesos
+
+    # Ajusta la capa final para que coincida con la arquitectura guardada
+    # Según las claves del state_dict: fc.1 (Linear), fc.3 (BN), fc.5 (Linear)
+    # Es decir: 0:Dropout/Identity, 1:Linear, 2:ReLU, 3:BN, 4:Dropout, 5:Linear
     model.fc = torch.nn.Sequential(
-        torch.nn.Dropout(0.5),             # Index 0
-        torch.nn.Linear(2048, 512),        # Index 1
-        torch.nn.ReLU(),                   # Index 2
-        torch.nn.BatchNorm1d(512),         # Index 3
-        torch.nn.Dropout(0.5),             # Index 4
-        torch.nn.Linear(512, num_classes)  # Index 5
+        torch.nn.Dropout(0.5),             # Índice 0
+        torch.nn.Linear(2048, 512),        # Índice 1
+        torch.nn.ReLU(),                   # Índice 2
+        torch.nn.BatchNorm1d(512),         # Índice 3
+        torch.nn.Dropout(0.5),             # Índice 4
+        torch.nn.Linear(512, num_classes)  # Índice 5
     )
-    
+
     if os.path.exists(path):
         state_dict = torch.load(path, map_location=DEVICE)
-        # Handle potential data parallel wrapping if keys start with 'module.'
-        # (Not observed in inspection, but good practice)
+        # Contempla el envoltorio de DataParallel si las claves empiezan por 'module.'
+        # (no se observó al inspeccionar los pesos, pero es buena práctica)
         # state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
         try:
             model.load_state_dict(state_dict)
@@ -135,7 +125,7 @@ def load_model(path=MODEL_PATH, num_classes=6):
     model.eval()
     return model
 
-# Global variables to hold model and classes
+# Variables globales que guardan el modelo y las clases
 model = None
 idx_to_class = None
 grad_cam = None
@@ -148,7 +138,7 @@ def initialize():
     num_classes = len(idx_to_class)
     model = load_model(num_classes=num_classes)
     
-    # Initialize CLIP
+    # Inicializa CLIP
     print("Loading CLIP model for content validation...")
     try:
         clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
@@ -157,8 +147,8 @@ def initialize():
     except Exception as e:
         print(f"Failed to load CLIP: {e}")
     
-    # Initialize GradCAM
-    # Layer 4 is the last convolutional block in ResNet
+    # Inicializa Grad-CAM
+    # layer4 es el último bloque convolucional de ResNet
     grad_cam = GradCAM(model, model.layer4)
 
 def predict_image(image_bytes):
@@ -200,7 +190,7 @@ def predict_image(image_bytes):
             detected_class_es = CLIP_LABELS[detected_class]
             return rejection("no_valida", f"La imagen no parece ser adecuada. Se detectó: {detected_class_es}. Por favor suba una foto clara de la piel del perro.")
 
-    transform = get_transforms()
+    transform = get_eval_transforms()
     input_tensor = transform(image).unsqueeze(0).to(DEVICE)
     
     # Prediction
@@ -224,11 +214,11 @@ def predict_image(image_bytes):
         key = idx_to_class.get(idx, "Unknown")
         top.append({"key": key, "label": CLASS_TRANSLATIONS.get(key, key), "confidence": prob})
 
-    # Grad-CAM requires gradients, so it runs its own forward/backward pass
+    # Grad-CAM necesita gradientes, así que hace su propia pasada hacia delante y hacia atrás
     heatmap = grad_cam.generate_heatmap(input_tensor, class_idx)
 
-    # Overlay on the exact region the model analyzed (center crop),
-    # otherwise the heatmap is misaligned on non-square photos
+    # Superpone sobre la región exacta que analizó el modelo (recorte central);
+    # si no, el mapa de calor queda desalineado en fotos no cuadradas
     analyzed_image = center_crop_like_model(image)
     result_image = GradCAM.overlay_heatmap(analyzed_image, heatmap)
 
