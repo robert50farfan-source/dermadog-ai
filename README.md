@@ -104,6 +104,19 @@ Los comandos deben ejecutarse desde la carpeta raíz del proyecto, porque las ru
 
 En los tres casos distintos de `ok`, el motivo viene en `message`.
 
+Errores HTTP (cuerpo `{"detail": "..."}`, sin los campos anteriores):
+
+| Código | Cuándo |
+|---|---|
+| `400` | El archivo no es una imagen (`Content-Type` distinto de `image/*`). |
+| `413` | El archivo supera 10 MB. |
+| `503` | El modelo no se pudo cargar (pesos ausentes o que no coinciden con la arquitectura). La app no predice con pesos incorrectos; el motivo queda en el log. |
+| `500` | Error inesperado al procesar la imagen. |
+
+CORS: el frontend se sirve desde el mismo servidor, así que no lo necesita. Por defecto solo se admiten
+`http://localhost:8000` y `http://127.0.0.1:8000`, sin credenciales. Para otros orígenes, defina
+`CORS_ORIGINS` con una lista separada por comas (p. ej. `CORS_ORIGINS=https://midominio.com`).
+
 ## Limitaciones conocidas
 
 - El modelo confunde algunos casos de **tiña** con piel **saludable**.
