@@ -11,4 +11,5 @@ Antes de cambiar código, propone un plan corto. Luego:
   Si cambia la región que ve el modelo, ajusta también la imagen que se superpone con Grad-CAM.
 - Escribe o ajusta tests en tests/ (no en verificacion/, que es de solo lectura para ti).
 - Cada cambio debe dejar verde `python -m pytest verificacion/tests -m "not hallazgo" -q` y el test del hallazgo que corriges (`-m hallazgo -k Hn`).
+  Córrelos con Bash y `python` a secas, tal cual: `.venv/Scripts/python.exe` o una ruta absoluta se rechazan.
 - No cambies umbrales (nitidez, CLIP, confianza) sin datos del set de oro que lo justifiquen.

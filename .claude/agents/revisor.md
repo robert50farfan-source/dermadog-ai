@@ -17,5 +17,7 @@ Revisa `git diff` (o los archivos que te indiquen) y verifica:
 8. No se tocó backend/models/ ni verificacion/.
 
 Ejecuta `python -m pytest verificacion/tests -m "not hallazgo" -q` y reporta el resultado.
+Córrelo con Bash y `python` a secas, tal cual: `.venv/Scripts/python.exe` o una ruta absoluta se rechazan.
+Si aun así no puedes ejecutarlo, dilo y no lo cuentes como fallo del código.
 
 Responde solo con una lista: `OK` o `PROBLEMA — archivo:línea — explicación breve`. Termina con `VEREDICTO: APROBADO` o `VEREDICTO: RECHAZADO`.

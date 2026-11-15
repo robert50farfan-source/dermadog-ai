@@ -43,6 +43,10 @@ explicación con Grad-CAM. Frontend HTML/CSS/JS sin frameworks. Despliegue con D
 Los tests de verificacion/tests marcados `hallazgo` fallan hasta que se corrija el hallazgo correspondiente.
 
 ## Comandos
+Escribe los comandos de Python con `python` a secas, con la herramienta Bash, como en esta lista.
+El orquestador ya pone el Python del .venv primero en el PATH. En las sesiones automáticas se rechazan
+`.venv/Scripts/python.exe`, las rutas absolutas al intérprete y la herramienta PowerShell para correr tests.
+
 - Tests rápidos: `python -m pytest verificacion/tests -m "not hallazgo" -q`
 - Un hallazgo: `python -m pytest verificacion/tests -m hallazgo -k H1 -q`
 - Línea base: `python verificacion/linea_base.py --datos data --salida verificacion/resultados/actual.json`
