@@ -1,7 +1,9 @@
 import torch
 import torchvision.models as models
 import json
+import logging
 import os
+import threading
 import cv2
 import numpy as np
 from PIL import Image
@@ -14,6 +16,12 @@ from .transforms import get_eval_transforms, model_crop_box
 MODEL_PATH = "backend/models/model_final_resnet50.pth"
 CLASS_IDX_PATH = "backend/models/class_to_idx.json"
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+logger = logging.getLogger(__name__)
+
+
+class ModeloNoDisponible(RuntimeError):
+    """El clasificador no se pudo cargar: la app no debe servir predicciones (H3)."""
 
 # Spanish display names for the model classes (keys from class_to_idx.json)
 CLASS_TRANSLATIONS = {
@@ -108,19 +116,19 @@ def load_model(path=MODEL_PATH, num_classes=6):
 
     if os.path.exists(path):
         state_dict = torch.load(path, map_location=DEVICE)
-        # Contempla el envoltorio de DataParallel si las claves empiezan por 'module.'
-        # (no se observó al inspeccionar los pesos, pero es buena práctica)
-        # state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
+        # Carga estricta (H3): si faltan o sobran claves, o no coinciden las formas,
+        # load_state_dict lanza RuntimeError y se propaga. Nunca se cae a strict=False.
         try:
-            model.load_state_dict(state_dict)
-            print("Model loaded successfully.")
-        except RuntimeError as e:
-            print(f"Error loading state_dict: {e}")
-            print("Attempting strict=False load (Use with caution)...")
-            model.load_state_dict(state_dict, strict=False)
+            model.load_state_dict(state_dict, strict=True)
+        except RuntimeError:
+            logger.exception("Los pesos de %s no coinciden con la arquitectura", path)
+            raise
+        logger.info("Modelo cargado en modo estricto desde %s", path)
     else:
-        print(f"Warning: Model file {path} not found. Using uninitialized weights (garbage predictions).")
-    
+        # Solo para tests y herramientas que necesitan la arquitectura sin pesos.
+        # initialize() exige que el archivo exista antes de llamar aquí.
+        logger.warning("No existe %s: modelo con pesos sin inicializar", path)
+
     model = model.to(DEVICE)
     model.eval()
     return model
@@ -131,32 +139,63 @@ idx_to_class = None
 grad_cam = None
 clip_model = None
 clip_processor = None
+# Motivo del último fallo de carga del clasificador (None si no ha fallado)
+load_error = None
+
+# Serializa la carga del modelo (arranque o primera petición)
+_init_lock = threading.Lock()
+# Serializa la inferencia del ResNet y el Grad-CAM: comparten el mismo modelo,
+# sus hooks y las activaciones/gradientes guardados (H4)
+_inference_lock = threading.Lock()
 
 def initialize():
-    global model, idx_to_class, grad_cam, clip_model, clip_processor
-    idx_to_class = load_class_mapping()
-    num_classes = len(idx_to_class)
-    model = load_model(num_classes=num_classes)
-    
-    # Inicializa CLIP
-    print("Loading CLIP model for content validation...")
-    try:
-        clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
-        clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-        print("CLIP model loaded successfully.")
-    except Exception as e:
-        print(f"Failed to load CLIP: {e}")
-    
-    # Inicializa Grad-CAM
-    # layer4 es el último bloque convolucional de ResNet
-    grad_cam = GradCAM(model, model.layer4)
+    global model, idx_to_class, grad_cam, clip_model, clip_processor, load_error
+    with _init_lock:
+        if model is not None:
+            # Otro hilo ya lo cargó mientras se esperaba el lock
+            return
+        try:
+            # Sin pesos no se sirven predicciones: el modelo sin inicializar daría resultados basura
+            if not os.path.exists(MODEL_PATH):
+                raise FileNotFoundError(f"No existe el archivo de pesos {MODEL_PATH}")
+            classes = load_class_mapping()
+            loaded = load_model(num_classes=len(classes))
+        except Exception as e:
+            model = None
+            grad_cam = None
+            load_error = f"{type(e).__name__}: {e}"
+            logger.error("No se pudo cargar el clasificador; /predict responderá 503. %s", load_error)
+            raise ModeloNoDisponible(load_error) from e
+
+        idx_to_class = classes
+        # layer4 es el último bloque convolucional de ResNet
+        grad_cam = GradCAM(loaded, loaded.layer4)
+        model = loaded
+        load_error = None
+
+        # Inicializa CLIP
+        logger.info("Cargando CLIP para validar el contenido...")
+        try:
+            clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+            clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+            logger.info("CLIP cargado.")
+        except Exception:
+            logger.exception("No se pudo cargar CLIP; se omitirá la validación de contenido")
+
+def ensure_model_loaded():
+    """Garantiza que el clasificador está cargado o lanza ModeloNoDisponible (H3)."""
+    if model is not None:
+        return
+    if load_error is not None:
+        # La carga ya falló: no se reintenta en cada petición
+        raise ModeloNoDisponible(load_error)
+    initialize()
+    if model is None:
+        raise ModeloNoDisponible("El modelo no está cargado")
 
 def predict_image(image_bytes):
-    global model, idx_to_class, grad_cam
-    
-    if model is None:
-        initialize()
-        
+    ensure_model_loaded()
+
     image = Image.open(image_bytes).convert('RGB')
     
     # Blur Detection
@@ -192,30 +231,35 @@ def predict_image(image_bytes):
 
     transform = get_eval_transforms()
     input_tensor = transform(image).unsqueeze(0).to(DEVICE)
-    
-    # Prediction
-    with torch.no_grad():
-        outputs = model(input_tensor)
-        probabilities = torch.nn.functional.softmax(outputs, dim=1)
-        top_probs, top_class_idxs = torch.topk(probabilities, min(3, probabilities.shape[1]))
 
-    class_idx = top_class_idxs[0, 0].item()
-    confidence = top_probs[0, 0].item()
-    predicted_label_en = idx_to_class.get(class_idx, "Unknown")
+    # Toma referencias locales: si otro hilo recarga el modelo, esta petición
+    # usa de forma coherente el par (modelo, grad_cam) con el que empezó
+    current_model, current_cam, classes = model, grad_cam, idx_to_class
 
-    # Threshold Check
-    if confidence < 0.60:
-        return rejection("baja_confianza", "No se puede determinar con suficiente confianza una enfermedad de la piel. La imagen no coincide claramente con los casos conocidos.")
+    # Predicción y Grad-CAM bajo el mismo lock (H4): el modelo y sus hooks son estado compartido
+    with _inference_lock:
+        with torch.no_grad():
+            outputs = current_model(input_tensor)
+            probabilities = torch.nn.functional.softmax(outputs, dim=1)
+            top_probs, top_class_idxs = torch.topk(probabilities, min(3, probabilities.shape[1]))
 
+        class_idx = top_class_idxs[0, 0].item()
+        confidence = top_probs[0, 0].item()
+
+        # Umbral de confianza
+        if confidence < 0.60:
+            return rejection("baja_confianza", "No se puede determinar con suficiente confianza una enfermedad de la piel. La imagen no coincide claramente con los casos conocidos.")
+
+        # Grad-CAM necesita gradientes, así que hace su propia pasada hacia delante y hacia atrás
+        heatmap = current_cam.generate_heatmap(input_tensor, class_idx)
+
+    predicted_label_en = classes.get(class_idx, "Unknown")
     predicted_label = CLASS_TRANSLATIONS.get(predicted_label_en, predicted_label_en)
 
     top = []
     for prob, idx in zip(top_probs[0].tolist(), top_class_idxs[0].tolist()):
-        key = idx_to_class.get(idx, "Unknown")
+        key = classes.get(idx, "Unknown")
         top.append({"key": key, "label": CLASS_TRANSLATIONS.get(key, key), "confidence": prob})
-
-    # Grad-CAM necesita gradientes, así que hace su propia pasada hacia delante y hacia atrás
-    heatmap = grad_cam.generate_heatmap(input_tensor, class_idx)
 
     # Superpone sobre la región exacta que analizó el modelo (recorte central);
     # si no, el mapa de calor queda desalineado en fotos no cuadradas
